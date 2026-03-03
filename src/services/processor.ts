@@ -54,7 +54,12 @@ export async function processPR(
     errors: 0,
   };
 
-  log(`Processing PR #${pr.pullRequestId}: ${pr.title}`);
+  log(`Processing PR #${pr.pullRequestId}: ${pr.title} (status: ${pr.status})`);
+
+  if (pr.status !== 'completed') {
+    log(`  PR #${pr.pullRequestId}: Status is "${pr.status}", only completed PRs are processed`);
+    return result;
+  }
 
   const workItemRefs = await deps.getPRWorkItems(
     config,

@@ -43,7 +43,10 @@ export async function runPollCycle(
     log(`Polling repo ${repoId}...`);
 
     const prs = await deps.listCompletedPRs(config, repoId);
-    const newPRs = prs.filter(pr => !stateStore.isProcessed(pr.pullRequestId));
+    const newPRs = prs.filter(pr =>
+      !stateStore.isProcessed(pr.pullRequestId) &&
+      pr.closedDate > stateStore.lastRunAt
+    );
 
     log(`  Found ${prs.length} completed PRs, ${newPRs.length} unprocessed`);
 

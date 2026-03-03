@@ -65,8 +65,9 @@ switch (command) {
       break;
     }
     const config = loadConfig();
-    config.dryRun = true;
-    console.log(`[DRY RUN] Testing resolution for PR #${prIdArg}\n`);
+    config.dryRun = dryRun;
+    if (dryRun) console.log('[DRY RUN] No writes will be made to Azure DevOps\n');
+    console.log(`Processing PR #${prIdArg}\n`);
     const repoId = config.repoIds[0]!;
     const pr = await getPullRequest(config, repoId, Number(prIdArg));
     const result = await processPR(config, pr);

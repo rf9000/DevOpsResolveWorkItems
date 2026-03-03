@@ -30,7 +30,7 @@ function mockPR(overrides: Partial<AzureDevOpsPullRequest> = {}): AzureDevOpsPul
     description: 'Adds a great new feature to the system',
     status: 'completed',
     creationDate: '2025-01-01T00:00:00Z',
-    closedDate: '2025-01-02T00:00:00Z',
+    closedDate: new Date(Date.now() + 86_400_000).toISOString(),
     sourceRefName: 'refs/heads/feature/new-feature',
     targetRefName: 'refs/heads/main',
     lastMergeSourceCommit: { commitId: 'source-commit-abc' },

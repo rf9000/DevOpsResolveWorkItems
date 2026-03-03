@@ -11,6 +11,15 @@ export class StateStore {
     this.filePath = join(stateDir, 'processed-prs.json');
     this.state = this.load();
     this.processedSet = new Set(this.state.processedPRIds);
+
+    if (!this.state.lastRunAt) {
+      this.state.lastRunAt = new Date().toISOString();
+      this.save();
+    }
+  }
+
+  get lastRunAt(): string {
+    return this.state.lastRunAt;
   }
 
   private load(): ProcessedState {
