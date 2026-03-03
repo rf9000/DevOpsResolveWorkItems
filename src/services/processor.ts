@@ -5,10 +5,11 @@ import type {
   PRWorkItemRef,
   WorkItemResponse,
 } from '../types/index.ts';
-import type { GeneratorContext } from './ai-generator.ts';
 
 import * as sdk from '../sdk/azure-devops-client.ts';
-import * as gen from './ai-generator.ts';
+
+/** Terminal states that should not be transitioned. */
+const TERMINAL_STATES = ['Resolved', 'Closed'];
 
 export interface ProcessorDeps {
   getPRWorkItems: (
@@ -22,43 +23,24 @@ export interface ProcessorDeps {
     workItemId: number,
   ) => Promise<WorkItemResponse>;
 
-  getPRChangedFiles: (
-    config: AppConfig,
-    repoId: string,
-    baseCommit: string,
-    targetCommit: string,
-  ) => Promise<string[]>;
-
   updateWorkItemField: (
     config: AppConfig,
     workItemId: number,
     fieldName: string,
     value: string,
   ) => Promise<WorkItemResponse>;
-
-  generateWithAI: (
-    config: AppConfig,
-    context: GeneratorContext,
-  ) => Promise<string>;
 }
 
 const defaultDeps: ProcessorDeps = {
   getPRWorkItems: sdk.getPRWorkItems,
   getWorkItem: sdk.getWorkItem,
-  getPRChangedFiles: sdk.getPRChangedFiles,
   updateWorkItemField: sdk.updateWorkItemField,
-  generateWithAI: gen.generateWithAI,
 };
 
 function log(message: string): void {
   const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
   console.log(`[${ts}] ${message}`);
 }
-
-// TODO: Replace this stub with your project-specific processing logic.
-// This example processes work items linked to completed PRs and generates
-// AI-powered summaries. Adapt the field checks, generation context, and
-// update logic to match your use case.
 
 export async function processPR(
   config: AppConfig,
@@ -67,7 +49,7 @@ export async function processPR(
 ): Promise<PRProcessResult> {
   const result: PRProcessResult = {
     prId: pr.pullRequestId,
-    processed: 0,
+    resolved: 0,
     skipped: 0,
     errors: 0,
   };
@@ -85,56 +67,40 @@ export async function processPR(
     return result;
   }
 
-  let changedFiles: string[] = [];
-  try {
-    changedFiles = await deps.getPRChangedFiles(
-      config,
-      pr.repository.id,
-      pr.lastMergeTargetCommit.commitId,
-      pr.lastMergeSourceCommit.commitId,
-    );
-  } catch (err) {
-    log(
-      `  PR #${pr.pullRequestId}: Warning — could not fetch changed files: ${err}`,
-    );
-  }
-
   for (const ref of workItemRefs) {
     const workItemId = Number(ref.id);
     try {
       const workItem = await deps.getWorkItem(config, workItemId);
 
-      const workItemTitle = String(workItem.fields['System.Title'] ?? '');
-      const workItemType = String(
-        workItem.fields['System.WorkItemType'] ?? '',
-      );
+      const workItemType = String(workItem.fields['System.WorkItemType'] ?? '');
+      const currentState = String(workItem.fields['System.State'] ?? '');
 
-      const context: GeneratorContext = {
-        prTitle: pr.title,
-        prDescription: pr.description ?? '',
-        changedFiles,
-        workItemTitle,
-        workItemType,
-      };
-
-      log(`  WI #${workItemId}: Generating AI output...`);
-      const output = await deps.generateWithAI(config, context);
-
-      if (config.dryRun) {
-        log(`  WI #${workItemId}: [DRY RUN] Generated:\n    "${output}"`);
-        result.processed++;
+      if (!config.allowedWorkItemTypes.includes(workItemType)) {
+        log(`  WI #${workItemId}: Type "${workItemType}" not in allowed list, skipping`);
+        result.skipped++;
         continue;
       }
 
-      // TODO: Replace 'System.Description' with the field you want to update
+      if (TERMINAL_STATES.includes(currentState)) {
+        log(`  WI #${workItemId}: Already "${currentState}", skipping`);
+        result.skipped++;
+        continue;
+      }
+
+      if (config.dryRun) {
+        log(`  WI #${workItemId}: [DRY RUN] Would resolve: ${currentState} → ${config.resolvedState}`);
+        result.resolved++;
+        continue;
+      }
+
       await deps.updateWorkItemField(
         config,
         workItemId,
-        'System.Description',
-        output,
+        'System.State',
+        config.resolvedState,
       );
-      log(`  WI #${workItemId}: Output written`);
-      result.processed++;
+      log(`  WI #${workItemId}: ${currentState} → ${config.resolvedState}`);
+      result.resolved++;
     } catch (err) {
       log(`  WI #${workItemId}: Error — ${err}`);
       result.errors++;

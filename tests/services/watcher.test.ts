@@ -15,8 +15,8 @@ function mockConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     pat: 'test-pat-token',
     repoIds: ['repo-1'],
     pollIntervalMinutes: 5,
-    claudeModel: 'claude-sonnet-4-6',
-    promptPath: './prompt.md',
+    resolvedState: 'Resolved',
+    allowedWorkItemTypes: ['Bug', 'User Story', 'Task'],
     stateDir: '.state',
     dryRun: false,
     ...overrides,
@@ -44,7 +44,7 @@ function makeDeps(overrides: Partial<WatcherDeps> = {}): WatcherDeps {
   return {
     listCompletedPRs: mock(() => Promise.resolve([])),
     processPR: mock(() =>
-      Promise.resolve({ prId: 0, processed: 0, skipped: 0, errors: 0 }),
+      Promise.resolve({ prId: 0, resolved: 0, skipped: 0, errors: 0 }),
     ),
     ...overrides,
   };
@@ -71,7 +71,7 @@ describe('runPollCycle', () => {
 
     const result = await runPollCycle(config, stateStore, deps);
 
-    expect(result).toEqual({ processed: 0, skipped: 0, errors: 0 });
+    expect(result).toEqual({ resolved: 0, skipped: 0, errors: 0 });
     expect(deps.listCompletedPRs).toHaveBeenCalledTimes(1);
     expect(deps.processPR).toHaveBeenCalledTimes(0);
   });
@@ -83,13 +83,13 @@ describe('runPollCycle', () => {
     const deps = makeDeps({
       listCompletedPRs: mock(() => Promise.resolve([pr])),
       processPR: mock(() =>
-        Promise.resolve({ prId: 101, processed: 1, skipped: 0, errors: 0 }),
+        Promise.resolve({ prId: 101, resolved: 1, skipped: 0, errors: 0 }),
       ),
     });
 
     const result = await runPollCycle(config, stateStore, deps);
 
-    expect(result).toEqual({ processed: 1, skipped: 0, errors: 0 });
+    expect(result).toEqual({ resolved: 1, skipped: 0, errors: 0 });
     expect(deps.processPR).toHaveBeenCalledTimes(1);
     expect(stateStore.isProcessed(101)).toBe(true);
 
@@ -110,7 +110,7 @@ describe('runPollCycle', () => {
 
     const result = await runPollCycle(config, stateStore, deps);
 
-    expect(result).toEqual({ processed: 0, skipped: 0, errors: 0 });
+    expect(result).toEqual({ resolved: 0, skipped: 0, errors: 0 });
     expect(deps.processPR).toHaveBeenCalledTimes(0);
   });
 
@@ -125,7 +125,7 @@ describe('runPollCycle', () => {
 
     const result = await runPollCycle(config, stateStore, deps);
 
-    expect(result).toEqual({ processed: 0, skipped: 0, errors: 1 });
+    expect(result).toEqual({ resolved: 0, skipped: 0, errors: 1 });
     expect(stateStore.isProcessed(300)).toBe(false);
   });
 
@@ -136,13 +136,13 @@ describe('runPollCycle', () => {
     const deps = makeDeps({
       listCompletedPRs: mock(() => Promise.resolve([pr])),
       processPR: mock(() =>
-        Promise.resolve({ prId: 400, processed: 0, skipped: 0, errors: 1 }),
+        Promise.resolve({ prId: 400, resolved: 0, skipped: 0, errors: 1 }),
       ),
     });
 
     const result = await runPollCycle(config, stateStore, deps);
 
-    expect(result).toEqual({ processed: 0, skipped: 0, errors: 1 });
+    expect(result).toEqual({ resolved: 0, skipped: 0, errors: 1 });
     expect(stateStore.isProcessed(400)).toBe(false);
   });
 
@@ -167,13 +167,13 @@ describe('runPollCycle', () => {
     const deps = makeDeps({
       listCompletedPRs: listMock,
       processPR: mock(() =>
-        Promise.resolve({ prId: 0, processed: 1, skipped: 0, errors: 0 }),
+        Promise.resolve({ prId: 0, resolved: 1, skipped: 0, errors: 0 }),
       ),
     });
 
     const result = await runPollCycle(config, stateStore, deps);
 
-    expect(result).toEqual({ processed: 2, skipped: 0, errors: 0 });
+    expect(result).toEqual({ resolved: 2, skipped: 0, errors: 0 });
     expect(deps.listCompletedPRs).toHaveBeenCalledTimes(3);
     expect(deps.processPR).toHaveBeenCalledTimes(2);
     expect(stateStore.isProcessed(501)).toBe(true);

@@ -34,8 +34,8 @@ export async function runPollCycle(
   config: AppConfig,
   stateStore: StateStore,
   deps: WatcherDeps = defaultDeps,
-): Promise<{ processed: number; skipped: number; errors: number }> {
-  let totalProcessed = 0;
+): Promise<{ resolved: number; skipped: number; errors: number }> {
+  let totalResolved = 0;
   let totalSkipped = 0;
   let totalErrors = 0;
 
@@ -50,7 +50,7 @@ export async function runPollCycle(
     for (const pr of newPRs) {
       try {
         const result = await deps.processPR(config, pr);
-        totalProcessed += result.processed;
+        totalResolved += result.resolved;
         totalSkipped += result.skipped;
         totalErrors += result.errors;
 
@@ -65,7 +65,7 @@ export async function runPollCycle(
   }
 
   stateStore.save();
-  return { processed: totalProcessed, skipped: totalSkipped, errors: totalErrors };
+  return { resolved: totalResolved, skipped: totalSkipped, errors: totalErrors };
 }
 
 function sleep(ms: number, signal: { aborted: boolean }): Promise<void> {
@@ -95,12 +95,14 @@ export async function startWatcher(config: AppConfig): Promise<void> {
 
   log(`Starting watcher — polling every ${config.pollIntervalMinutes} minutes`);
   log(`Watching ${config.repoIds.length} repo(s)`);
+  log(`Target state: ${config.resolvedState}`);
+  log(`Allowed types: ${config.allowedWorkItemTypes.join(', ')}`);
   log(`${stateStore.processedCount} PRs already processed`);
 
   while (!signal.aborted) {
     try {
       const result = await runPollCycle(config, stateStore);
-      log(`Cycle complete: ${result.processed} processed, ${result.skipped} skipped, ${result.errors} errors`);
+      log(`Cycle complete: ${result.resolved} resolved, ${result.skipped} skipped, ${result.errors} errors`);
     } catch (err) {
       log(`Cycle failed: ${err}`);
     }

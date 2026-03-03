@@ -34,7 +34,7 @@ describe.skipIf(!hasCredentials)('Integration: Azure DevOps API', () => {
     }
   });
 
-  test('can get work item details', async () => {
+  test('can get work item with state field', async () => {
     const config = loadConfig();
     const repoId = config.repoIds[0]!;
     const prs = await listCompletedPRs(config, repoId, 5);
@@ -46,6 +46,8 @@ describe.skipIf(!hasCredentials)('Integration: Azure DevOps API', () => {
         expect(wi.id).toBeNumber();
         expect(wi.fields).toBeDefined();
         expect(wi.fields['System.Title']).toBeString();
+        expect(wi.fields['System.State']).toBeString();
+        expect(wi.fields['System.WorkItemType']).toBeString();
       }
     }
   });

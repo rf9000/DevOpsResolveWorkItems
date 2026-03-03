@@ -1,5 +1,5 @@
 {
-  "name": "devops-pull-template",
+  "name": "devops-resolve-work-items",
   "version": "0.1.0",
   "type": "module",
   "module": "src/cli/index.ts",
@@ -12,7 +12,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "latest",
     "zod": "latest"
   },
   "devDependencies": {

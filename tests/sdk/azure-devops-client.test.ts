@@ -22,8 +22,8 @@ function mockConfig(): AppConfig {
     pat: 'test-pat-token',
     repoIds: ['repo-1'],
     pollIntervalMinutes: 5,
-    claudeModel: 'claude-sonnet-4-6',
-    promptPath: './prompt.md',
+    resolvedState: 'Resolved',
+    allowedWorkItemTypes: ['Bug', 'User Story', 'Task'],
     stateDir: '.state',
     dryRun: false,
   };

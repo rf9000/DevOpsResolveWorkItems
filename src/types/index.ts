@@ -6,8 +6,8 @@ export interface AppConfig {
   pat: string;
   repoIds: string[];
   pollIntervalMinutes: number;
-  claudeModel: string;
-  promptPath: string;
+  resolvedState: string;
+  allowedWorkItemTypes: string[];
   stateDir: string;
   dryRun: boolean;
 }
@@ -61,7 +61,7 @@ export interface ProcessedState {
 /** Result summary after processing a single pull request. */
 export interface PRProcessResult {
   prId: number;
-  processed: number;
+  resolved: number;
   skipped: number;
   errors: number;
 }

@@ -3,7 +3,7 @@ import type { AppConfig, AzureDevOpsPullRequest } from '../../src/types/index.ts
 import { processPR } from '../../src/services/processor.ts';
 import type { ProcessorDeps } from '../../src/services/processor.ts';
 
-function mockConfig(): AppConfig {
+function mockConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
     org: 'my-org',
     orgUrl: 'https://dev.azure.com/my-org',
@@ -11,10 +11,11 @@ function mockConfig(): AppConfig {
     pat: 'test-pat-token',
     repoIds: ['repo-1'],
     pollIntervalMinutes: 5,
-    claudeModel: 'claude-sonnet-4-6',
-    promptPath: './prompt.md',
+    resolvedState: 'Resolved',
+    allowedWorkItemTypes: ['Bug', 'User Story', 'Task'],
     stateDir: '.state',
     dryRun: false,
+    ...overrides,
   };
 }
 
@@ -41,12 +42,15 @@ function makeDeps(overrides: Partial<ProcessorDeps> = {}): ProcessorDeps {
     getWorkItem: mock(() =>
       Promise.resolve({
         id: 100,
-        fields: { 'System.Title': 'Work item', 'System.WorkItemType': 'User Story' },
+        fields: {
+          'System.Title': 'Work item',
+          'System.WorkItemType': 'Bug',
+          'System.State': 'Active',
+        },
         rev: 1,
         url: 'https://example.com/100',
       }),
     ),
-    getPRChangedFiles: mock(() => Promise.resolve(['/src/index.ts', '/README.md'])),
     updateWorkItemField: mock(() =>
       Promise.resolve({
         id: 100,
@@ -55,7 +59,6 @@ function makeDeps(overrides: Partial<ProcessorDeps> = {}): ProcessorDeps {
         url: 'https://example.com/100',
       }),
     ),
-    generateWithAI: mock(() => Promise.resolve('Generated output')),
     ...overrides,
   };
 }
@@ -70,13 +73,12 @@ describe('processPR', () => {
 
     const result = await processPR(config, pr, deps);
 
-    expect(result).toEqual({ prId: 42, processed: 0, skipped: 0, errors: 0 });
+    expect(result).toEqual({ prId: 42, resolved: 0, skipped: 0, errors: 0 });
     expect(deps.getPRWorkItems).toHaveBeenCalledTimes(1);
     expect(deps.getWorkItem).toHaveBeenCalledTimes(0);
-    expect(deps.getPRChangedFiles).toHaveBeenCalledTimes(0);
   });
 
-  test('PR with work item generates and writes output', async () => {
+  test('resolves work item in Active state', async () => {
     const config = mockConfig();
     const pr = mockPR();
     const deps = makeDeps({
@@ -89,24 +91,107 @@ describe('processPR', () => {
           fields: {
             'System.Title': 'Fix login bug',
             'System.WorkItemType': 'Bug',
+            'System.State': 'Active',
           },
           rev: 1,
           url: 'https://example.com/100',
         }),
       ),
-      getPRChangedFiles: mock(() =>
-        Promise.resolve(['/src/auth/login.ts']),
-      ),
-      generateWithAI: mock(() => Promise.resolve('AI generated output')),
     });
 
     const result = await processPR(config, pr, deps);
 
-    expect(result).toEqual({ prId: 42, processed: 1, skipped: 0, errors: 0 });
-    expect(deps.generateWithAI).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ prId: 42, resolved: 1, skipped: 0, errors: 0 });
+    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(1);
+
+    const updateCall = (deps.updateWorkItemField as ReturnType<typeof mock>).mock.calls[0]!;
+    expect(updateCall[1]).toBe(100);
+    expect(updateCall[2]).toBe('System.State');
+    expect(updateCall[3]).toBe('Resolved');
   });
 
-  test('PR with generation failure counts as error', async () => {
+  test('skips work item already in Resolved state', async () => {
+    const config = mockConfig();
+    const pr = mockPR();
+    const deps = makeDeps({
+      getPRWorkItems: mock(() =>
+        Promise.resolve([{ id: '100', url: 'https://example.com/100' }]),
+      ),
+      getWorkItem: mock(() =>
+        Promise.resolve({
+          id: 100,
+          fields: {
+            'System.Title': 'Already done',
+            'System.WorkItemType': 'Bug',
+            'System.State': 'Resolved',
+          },
+          rev: 1,
+          url: 'https://example.com/100',
+        }),
+      ),
+    });
+
+    const result = await processPR(config, pr, deps);
+
+    expect(result).toEqual({ prId: 42, resolved: 0, skipped: 1, errors: 0 });
+    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(0);
+  });
+
+  test('skips work item already in Closed state', async () => {
+    const config = mockConfig();
+    const pr = mockPR();
+    const deps = makeDeps({
+      getPRWorkItems: mock(() =>
+        Promise.resolve([{ id: '100', url: 'https://example.com/100' }]),
+      ),
+      getWorkItem: mock(() =>
+        Promise.resolve({
+          id: 100,
+          fields: {
+            'System.Title': 'Already closed',
+            'System.WorkItemType': 'Task',
+            'System.State': 'Closed',
+          },
+          rev: 1,
+          url: 'https://example.com/100',
+        }),
+      ),
+    });
+
+    const result = await processPR(config, pr, deps);
+
+    expect(result).toEqual({ prId: 42, resolved: 0, skipped: 1, errors: 0 });
+    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(0);
+  });
+
+  test('skips work item with disallowed type', async () => {
+    const config = mockConfig({ allowedWorkItemTypes: ['Bug', 'Task'] });
+    const pr = mockPR();
+    const deps = makeDeps({
+      getPRWorkItems: mock(() =>
+        Promise.resolve([{ id: '100', url: 'https://example.com/100' }]),
+      ),
+      getWorkItem: mock(() =>
+        Promise.resolve({
+          id: 100,
+          fields: {
+            'System.Title': 'Epic item',
+            'System.WorkItemType': 'Epic',
+            'System.State': 'Active',
+          },
+          rev: 1,
+          url: 'https://example.com/100',
+        }),
+      ),
+    });
+
+    const result = await processPR(config, pr, deps);
+
+    expect(result).toEqual({ prId: 42, resolved: 0, skipped: 1, errors: 0 });
+    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(0);
+  });
+
+  test('update failure counts as error', async () => {
     const config = mockConfig();
     const pr = mockPR();
     const deps = makeDeps({
@@ -119,64 +204,24 @@ describe('processPR', () => {
           fields: {
             'System.Title': 'Broken feature',
             'System.WorkItemType': 'Bug',
+            'System.State': 'Active',
           },
           rev: 1,
           url: 'https://example.com/300',
         }),
       ),
-      generateWithAI: mock(() =>
-        Promise.reject(new Error('Claude API error')),
+      updateWorkItemField: mock(() =>
+        Promise.reject(new Error('API error')),
       ),
     });
 
     const result = await processPR(config, pr, deps);
 
-    expect(result).toEqual({ prId: 42, processed: 0, skipped: 0, errors: 1 });
-    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(0);
+    expect(result).toEqual({ prId: 42, resolved: 0, skipped: 0, errors: 1 });
   });
 
-  test('changed files fetch failure still processes work items', async () => {
-    const config = mockConfig();
-    const pr = mockPR();
-    const deps = makeDeps({
-      getPRWorkItems: mock(() =>
-        Promise.resolve([{ id: '100', url: 'https://example.com/100' }]),
-      ),
-      getWorkItem: mock(() =>
-        Promise.resolve({
-          id: 100,
-          fields: {
-            'System.Title': 'Some feature',
-            'System.WorkItemType': 'User Story',
-          },
-          rev: 1,
-          url: 'https://example.com/100',
-        }),
-      ),
-      getPRChangedFiles: mock(() =>
-        Promise.reject(new Error('Diff API failed')),
-      ),
-      generateWithAI: mock(() =>
-        Promise.resolve('Output without file context'),
-      ),
-    });
-
-    const result = await processPR(config, pr, deps);
-
-    expect(result).toEqual({ prId: 42, processed: 1, skipped: 0, errors: 0 });
-
-    const genCall = (deps.generateWithAI as ReturnType<typeof mock>).mock.calls[0]!;
-    expect(genCall[1]).toEqual({
-      prTitle: 'Add new feature',
-      prDescription: 'Adds a great new feature to the system',
-      changedFiles: [],
-      workItemTitle: 'Some feature',
-      workItemType: 'User Story',
-    });
-  });
-
-  test('dry run generates but does not write', async () => {
-    const config = { ...mockConfig(), dryRun: true };
+  test('dry run logs but does not update', async () => {
+    const config = mockConfig({ dryRun: true });
     const pr = mockPR();
     const deps = makeDeps({
       getPRWorkItems: mock(() =>
@@ -188,17 +233,49 @@ describe('processPR', () => {
           fields: {
             'System.Title': 'Feature',
             'System.WorkItemType': 'User Story',
+            'System.State': 'Active',
           },
           rev: 1,
           url: 'https://example.com/100',
         }),
       ),
-      generateWithAI: mock(() => Promise.resolve('Dry run output')),
     });
 
     const result = await processPR(config, pr, deps);
 
-    expect(result).toEqual({ prId: 42, processed: 1, skipped: 0, errors: 0 });
+    expect(result).toEqual({ prId: 42, resolved: 1, skipped: 0, errors: 0 });
     expect(deps.updateWorkItemField).toHaveBeenCalledTimes(0);
+  });
+
+  test('mixed work items: resolve one, skip one terminal, skip one wrong type', async () => {
+    const config = mockConfig({ allowedWorkItemTypes: ['Bug', 'Task'] });
+    const pr = mockPR();
+
+    let getCallIndex = 0;
+    const workItems = [
+      { id: 101, fields: { 'System.Title': 'Bug fix', 'System.WorkItemType': 'Bug', 'System.State': 'Active' }, rev: 1, url: '' },
+      { id: 102, fields: { 'System.Title': 'Done task', 'System.WorkItemType': 'Task', 'System.State': 'Closed' }, rev: 1, url: '' },
+      { id: 103, fields: { 'System.Title': 'An epic', 'System.WorkItemType': 'Epic', 'System.State': 'Active' }, rev: 1, url: '' },
+    ];
+
+    const deps = makeDeps({
+      getPRWorkItems: mock(() =>
+        Promise.resolve([
+          { id: '101', url: '' },
+          { id: '102', url: '' },
+          { id: '103', url: '' },
+        ]),
+      ),
+      getWorkItem: mock(() => {
+        const wi = workItems[getCallIndex]!;
+        getCallIndex++;
+        return Promise.resolve(wi);
+      }),
+    });
+
+    const result = await processPR(config, pr, deps);
+
+    expect(result).toEqual({ prId: 42, resolved: 1, skipped: 2, errors: 0 });
+    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(1);
   });
 });

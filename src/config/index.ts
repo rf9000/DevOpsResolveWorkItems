@@ -7,8 +7,8 @@ const envSchema = z.object({
   AZURE_DEVOPS_PROJECT: z.string().min(1, "AZURE_DEVOPS_PROJECT is required"),
   AZURE_DEVOPS_REPO_IDS: z.string().min(1, "AZURE_DEVOPS_REPO_IDS is required"),
   POLL_INTERVAL_MINUTES: z.coerce.number().default(15),
-  CLAUDE_MODEL: z.string().default("claude-sonnet-4-6"),
-  PROMPT_PATH: z.string().default(".claude/commands/do-process-item.md"),
+  RESOLVED_STATE: z.string().default("Resolved"),
+  ALLOWED_WORK_ITEM_TYPES: z.string().default("Bug,User Story,Task"),
   STATE_DIR: z.string().default(".state"),
 });
 
@@ -31,6 +31,11 @@ export function loadConfig(
     .map((id) => id.trim())
     .filter((id) => id.length > 0);
 
+  const allowedWorkItemTypes = parsed.ALLOWED_WORK_ITEM_TYPES
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+
   return {
     org: parsed.AZURE_DEVOPS_ORG,
     orgUrl: `https://dev.azure.com/${parsed.AZURE_DEVOPS_ORG}`,
@@ -38,8 +43,8 @@ export function loadConfig(
     pat: parsed.AZURE_DEVOPS_PAT,
     repoIds,
     pollIntervalMinutes: parsed.POLL_INTERVAL_MINUTES,
-    claudeModel: parsed.CLAUDE_MODEL,
-    promptPath: parsed.PROMPT_PATH,
+    resolvedState: parsed.RESOLVED_STATE,
+    allowedWorkItemTypes,
     stateDir: parsed.STATE_DIR,
     dryRun: false,
   };

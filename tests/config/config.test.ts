@@ -47,8 +47,8 @@ describe("loadConfig", () => {
     const config = loadConfig(validEnv);
 
     expect(config.pollIntervalMinutes).toBe(15);
-    expect(config.claudeModel).toBe("claude-sonnet-4-6");
-    expect(config.promptPath).toBe(".claude/commands/do-process-item.md");
+    expect(config.resolvedState).toBe("Resolved");
+    expect(config.allowedWorkItemTypes).toEqual(["Bug", "User Story", "Task"]);
     expect(config.stateDir).toBe(".state");
   });
 
@@ -56,17 +56,26 @@ describe("loadConfig", () => {
     const env = {
       ...validEnv,
       POLL_INTERVAL_MINUTES: "30",
-      CLAUDE_MODEL: "claude-opus-4-6",
-      PROMPT_PATH: "custom/prompt.md",
+      RESOLVED_STATE: "Closed",
+      ALLOWED_WORK_ITEM_TYPES: "Bug,Feature",
       STATE_DIR: "/tmp/state",
     };
 
     const config = loadConfig(env);
 
     expect(config.pollIntervalMinutes).toBe(30);
-    expect(config.claudeModel).toBe("claude-opus-4-6");
-    expect(config.promptPath).toBe("custom/prompt.md");
+    expect(config.resolvedState).toBe("Closed");
+    expect(config.allowedWorkItemTypes).toEqual(["Bug", "Feature"]);
     expect(config.stateDir).toBe("/tmp/state");
+  });
+
+  it("splits and trims allowed work item types", () => {
+    const env = {
+      ...validEnv,
+      ALLOWED_WORK_ITEM_TYPES: " Bug , User Story , Task ",
+    };
+    const config = loadConfig(env);
+    expect(config.allowedWorkItemTypes).toEqual(["Bug", "User Story", "Task"]);
   });
 
   it("splits repo IDs and trims whitespace", () => {

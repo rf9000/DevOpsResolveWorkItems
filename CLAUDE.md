@@ -4,13 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-DevOpsPullTemplate is a GitHub template repository for Azure DevOps automation projects. It provides production-ready scaffolding for pulling data from Azure DevOps, processing it (optionally with AI), and tracking state.
+DevOpsResolveWorkItems polls Azure DevOps for completed pull requests every 15 minutes, finds linked work items, and sets their state to "Resolved". It targets Bug, User Story, and Task work item types by default, skipping items already in terminal states (Resolved/Closed).
 
 ## Architecture
 
 - **Runtime:** Bun (TypeScript)
 - **Validation:** Zod for environment config
-- **AI:** @anthropic-ai/claude-agent-sdk for Claude integration
 - **Testing:** Bun's built-in test framework
 
 ## Key Patterns
@@ -31,7 +30,7 @@ DevOpsPullTemplate is a GitHub template repository for Azure DevOps automation p
 
 - `src/config/` — Zod env validation
 - `src/sdk/` — Azure DevOps REST client
-- `src/services/` — business logic (processor, watcher, AI generator)
+- `src/services/` — business logic (processor, watcher)
 - `src/state/` — JSON persistence
 - `src/types/` — shared interfaces
 - `tests/` — mirrors src/ structure
