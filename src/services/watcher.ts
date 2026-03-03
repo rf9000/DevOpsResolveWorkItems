@@ -26,7 +26,7 @@ const defaultDeps: WatcherDeps = {
 };
 
 function log(message: string): void {
-  const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const ts = new Date().toLocaleString('sv-SE', { hour12: false }).replace('T', ' ');
   console.log(`[${ts}] ${message}`);
 }
 
