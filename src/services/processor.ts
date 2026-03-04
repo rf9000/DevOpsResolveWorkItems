@@ -92,6 +92,16 @@ export async function processPR(
         continue;
       }
 
+      const tags = String(workItem.fields['System.Tags'] ?? '')
+        .split(';')
+        .map(t => t.trim());
+      const matchedTag = config.skipTags.find(st => tags.includes(st));
+      if (matchedTag) {
+        log(`  WI #${workItemId}: Has "${matchedTag}" tag, skipping`);
+        result.skipped++;
+        continue;
+      }
+
       if (config.dryRun) {
         log(`  WI #${workItemId}: [DRY RUN] Would resolve: ${currentState} → ${config.resolvedState}`);
         result.resolved++;

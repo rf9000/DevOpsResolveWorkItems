@@ -49,6 +49,7 @@ describe("loadConfig", () => {
     expect(config.pollIntervalMinutes).toBe(15);
     expect(config.resolvedState).toBe("Resolved");
     expect(config.allowedWorkItemTypes).toEqual(["Bug", "User Story", "Task"]);
+    expect(config.skipTags).toEqual(["Recurring"]);
     expect(config.stateDir).toBe(".state");
   });
 
@@ -58,6 +59,7 @@ describe("loadConfig", () => {
       POLL_INTERVAL_MINUTES: "30",
       RESOLVED_STATE: "Closed",
       ALLOWED_WORK_ITEM_TYPES: "Bug,Feature",
+      SKIP_TAGS: "Recurring,DoNotResolve",
       STATE_DIR: "/tmp/state",
     };
 
@@ -66,6 +68,7 @@ describe("loadConfig", () => {
     expect(config.pollIntervalMinutes).toBe(30);
     expect(config.resolvedState).toBe("Closed");
     expect(config.allowedWorkItemTypes).toEqual(["Bug", "Feature"]);
+    expect(config.skipTags).toEqual(["Recurring", "DoNotResolve"]);
     expect(config.stateDir).toBe("/tmp/state");
   });
 

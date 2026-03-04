@@ -13,6 +13,7 @@ function mockConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     pollIntervalMinutes: 5,
     resolvedState: 'Resolved',
     allowedWorkItemTypes: ['Bug', 'User Story', 'Task'],
+    skipTags: ['Recurring'],
     stateDir: '.state',
     dryRun: false,
     ...overrides,
@@ -277,5 +278,33 @@ describe('processPR', () => {
 
     expect(result).toEqual({ prId: 42, resolved: 1, skipped: 2, errors: 0 });
     expect(deps.updateWorkItemField).toHaveBeenCalledTimes(1);
+  });
+
+  test('skips work item with a skip tag', async () => {
+    const config = mockConfig({ skipTags: ['Recurring', 'DoNotResolve'] });
+    const pr = mockPR();
+    const deps = makeDeps({
+      getPRWorkItems: mock(() =>
+        Promise.resolve([{ id: '100', url: 'https://example.com/100' }]),
+      ),
+      getWorkItem: mock(() =>
+        Promise.resolve({
+          id: 100,
+          fields: {
+            'System.Title': 'Recurring task',
+            'System.WorkItemType': 'Task',
+            'System.State': 'Active',
+            'System.Tags': 'Important; Recurring',
+          },
+          rev: 1,
+          url: 'https://example.com/100',
+        }),
+      ),
+    });
+
+    const result = await processPR(config, pr, deps);
+
+    expect(result).toEqual({ prId: 42, resolved: 0, skipped: 1, errors: 0 });
+    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(0);
   });
 });

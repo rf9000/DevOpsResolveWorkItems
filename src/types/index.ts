@@ -8,6 +8,7 @@ export interface AppConfig {
   pollIntervalMinutes: number;
   resolvedState: string;
   allowedWorkItemTypes: string[];
+  skipTags: string[];
   stateDir: string;
   dryRun: boolean;
 }

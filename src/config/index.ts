@@ -9,6 +9,7 @@ const envSchema = z.object({
   POLL_INTERVAL_MINUTES: z.coerce.number().default(15),
   RESOLVED_STATE: z.string().default("Resolved"),
   ALLOWED_WORK_ITEM_TYPES: z.string().default("Bug,User Story,Task"),
+  SKIP_TAGS: z.string().default("Recurring"),
   STATE_DIR: z.string().default(".state"),
 });
 
@@ -36,6 +37,11 @@ export function loadConfig(
     .map((t) => t.trim())
     .filter((t) => t.length > 0);
 
+  const skipTags = parsed.SKIP_TAGS
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+
   return {
     org: parsed.AZURE_DEVOPS_ORG,
     orgUrl: `https://dev.azure.com/${parsed.AZURE_DEVOPS_ORG}`,
@@ -45,6 +51,7 @@ export function loadConfig(
     pollIntervalMinutes: parsed.POLL_INTERVAL_MINUTES,
     resolvedState: parsed.RESOLVED_STATE,
     allowedWorkItemTypes,
+    skipTags,
     stateDir: parsed.STATE_DIR,
     dryRun: false,
   };

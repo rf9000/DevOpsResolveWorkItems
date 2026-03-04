@@ -24,6 +24,7 @@ function mockConfig(): AppConfig {
     pollIntervalMinutes: 5,
     resolvedState: 'Resolved',
     allowedWorkItemTypes: ['Bug', 'User Story', 'Task'],
+    skipTags: ['Recurring'],
     stateDir: '.state',
     dryRun: false,
   };
