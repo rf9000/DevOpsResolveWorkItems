@@ -6,7 +6,7 @@ const envSchema = z.object({
   AZURE_DEVOPS_ORG: z.string().min(1, "AZURE_DEVOPS_ORG is required"),
   AZURE_DEVOPS_PROJECT: z.string().min(1, "AZURE_DEVOPS_PROJECT is required"),
   AZURE_DEVOPS_REPO_IDS: z.string().min(1, "AZURE_DEVOPS_REPO_IDS is required"),
-  POLL_INTERVAL_MINUTES: z.coerce.number().default(40),
+  POLL_INTERVAL_MINUTES: z.coerce.number().default(15),
   RESOLVED_STATE: z.string().default("Resolved"),
   ALLOWED_WORK_ITEM_TYPES: z.string().default("Bug,User Story,Task"),
   STATE_DIR: z.string().default(".state"),
