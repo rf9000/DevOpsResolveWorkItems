@@ -52,7 +52,7 @@ function makeDeps(overrides: Partial<ProcessorDeps> = {}): ProcessorDeps {
         url: 'https://example.com/100',
       }),
     ),
-    updateWorkItemField: mock(() =>
+    updateWorkItemFields: mock(() =>
       Promise.resolve({
         id: 100,
         fields: {},
@@ -103,12 +103,14 @@ describe('processPR', () => {
     const result = await processPR(config, pr, deps);
 
     expect(result).toEqual({ prId: 42, resolved: 1, skipped: 0, errors: 0 });
-    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(1);
+    expect(deps.updateWorkItemFields).toHaveBeenCalledTimes(1);
 
-    const updateCall = (deps.updateWorkItemField as ReturnType<typeof mock>).mock.calls[0]!;
+    const updateCall = (deps.updateWorkItemFields as ReturnType<typeof mock>).mock.calls[0]!;
     expect(updateCall[1]).toBe(100);
-    expect(updateCall[2]).toBe('System.State');
-    expect(updateCall[3]).toBe('Resolved');
+    expect(updateCall[2]).toEqual([
+      { field: 'System.State', value: 'Resolved' },
+      { field: 'System.AssignedTo', value: '' },
+    ]);
   });
 
   test('skips work item already in Resolved state', async () => {
@@ -135,7 +137,7 @@ describe('processPR', () => {
     const result = await processPR(config, pr, deps);
 
     expect(result).toEqual({ prId: 42, resolved: 0, skipped: 1, errors: 0 });
-    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(0);
+    expect(deps.updateWorkItemFields).toHaveBeenCalledTimes(0);
   });
 
   test('skips work item already in Closed state', async () => {
@@ -162,7 +164,7 @@ describe('processPR', () => {
     const result = await processPR(config, pr, deps);
 
     expect(result).toEqual({ prId: 42, resolved: 0, skipped: 1, errors: 0 });
-    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(0);
+    expect(deps.updateWorkItemFields).toHaveBeenCalledTimes(0);
   });
 
   test('skips work item with disallowed type', async () => {
@@ -189,7 +191,7 @@ describe('processPR', () => {
     const result = await processPR(config, pr, deps);
 
     expect(result).toEqual({ prId: 42, resolved: 0, skipped: 1, errors: 0 });
-    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(0);
+    expect(deps.updateWorkItemFields).toHaveBeenCalledTimes(0);
   });
 
   test('update failure counts as error', async () => {
@@ -211,7 +213,7 @@ describe('processPR', () => {
           url: 'https://example.com/300',
         }),
       ),
-      updateWorkItemField: mock(() =>
+      updateWorkItemFields: mock(() =>
         Promise.reject(new Error('API error')),
       ),
     });
@@ -245,7 +247,7 @@ describe('processPR', () => {
     const result = await processPR(config, pr, deps);
 
     expect(result).toEqual({ prId: 42, resolved: 1, skipped: 0, errors: 0 });
-    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(0);
+    expect(deps.updateWorkItemFields).toHaveBeenCalledTimes(0);
   });
 
   test('mixed work items: resolve one, skip one terminal, skip one wrong type', async () => {
@@ -277,7 +279,7 @@ describe('processPR', () => {
     const result = await processPR(config, pr, deps);
 
     expect(result).toEqual({ prId: 42, resolved: 1, skipped: 2, errors: 0 });
-    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(1);
+    expect(deps.updateWorkItemFields).toHaveBeenCalledTimes(1);
   });
 
   test('skips work item with a skip tag', async () => {
@@ -305,6 +307,6 @@ describe('processPR', () => {
     const result = await processPR(config, pr, deps);
 
     expect(result).toEqual({ prId: 42, resolved: 0, skipped: 1, errors: 0 });
-    expect(deps.updateWorkItemField).toHaveBeenCalledTimes(0);
+    expect(deps.updateWorkItemFields).toHaveBeenCalledTimes(0);
   });
 });

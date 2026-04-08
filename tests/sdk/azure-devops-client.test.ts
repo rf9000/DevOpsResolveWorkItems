@@ -8,7 +8,7 @@ import {
   getPRWorkItems,
   getWorkItem,
   getPRChangedFiles,
-  updateWorkItemField,
+  updateWorkItemFields,
 } from '../../src/sdk/azure-devops-client.ts';
 
 const originalFetch = globalThis.fetch;
@@ -252,7 +252,7 @@ describe('getPRChangedFiles', () => {
   });
 });
 
-describe('updateWorkItemField', () => {
+describe('updateWorkItemFields', () => {
   test('sends PATCH with json-patch body and correct content-type', async () => {
     const updated = {
       id: 100,
@@ -263,12 +263,9 @@ describe('updateWorkItemField', () => {
     setMockFetch(updated);
     const config = mockConfig();
 
-    const result = await updateWorkItemField(
-      config,
-      100,
-      'Custom.Field',
-      'New value',
-    );
+    const result = await updateWorkItemFields(config, 100, [
+      { field: 'Custom.Field', value: 'New value' },
+    ]);
 
     expect(result).toEqual(updated);
 
@@ -286,7 +283,7 @@ describe('updateWorkItemField', () => {
     const body = JSON.parse(init.body as string) as Array<{
       op: string;
       path: string;
-      value: string;
+      value: unknown;
     }>;
     expect(body).toEqual([
       { op: 'add', path: '/fields/Custom.Field', value: 'New value' },

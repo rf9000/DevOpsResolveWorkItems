@@ -138,16 +138,20 @@ export async function getPRChangedFiles(
   return data.changes.map((c) => c.item.path);
 }
 
-export async function updateWorkItemField(
+export async function updateWorkItemFields(
   config: AppConfig,
   workItemId: number,
-  fieldName: string,
-  value: string,
+  fields: Array<{ field: string; value: unknown }>,
 ): Promise<WorkItemResponse> {
   const path = `wit/workitems/${workItemId}?api-version=7.0`;
+  const ops = fields.map(({ field, value }) => ({
+    op: 'add',
+    path: `/fields/${field}`,
+    value,
+  }));
   return adoFetchWithRetry<WorkItemResponse>(config, path, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json-patch+json' },
-    body: JSON.stringify([{ op: 'add', path: `/fields/${fieldName}`, value }]),
+    body: JSON.stringify(ops),
   });
 }

@@ -23,18 +23,17 @@ export interface ProcessorDeps {
     workItemId: number,
   ) => Promise<WorkItemResponse>;
 
-  updateWorkItemField: (
+  updateWorkItemFields: (
     config: AppConfig,
     workItemId: number,
-    fieldName: string,
-    value: string,
+    fields: Array<{ field: string; value: unknown }>,
   ) => Promise<WorkItemResponse>;
 }
 
 const defaultDeps: ProcessorDeps = {
   getPRWorkItems: sdk.getPRWorkItems,
   getWorkItem: sdk.getWorkItem,
-  updateWorkItemField: sdk.updateWorkItemField,
+  updateWorkItemFields: sdk.updateWorkItemFields,
 };
 
 function log(message: string): void {
@@ -108,12 +107,12 @@ export async function processPR(
         continue;
       }
 
-      await deps.updateWorkItemField(
-        config,
-        workItemId,
-        'System.State',
-        config.resolvedState,
-      );
+      const assignedTo = workItem.fields['System.AssignedTo'] ?? '';
+
+      await deps.updateWorkItemFields(config, workItemId, [
+        { field: 'System.State', value: config.resolvedState },
+        { field: 'System.AssignedTo', value: assignedTo },
+      ]);
       log(`  WI #${workItemId}: ${currentState} → ${config.resolvedState}`);
       result.resolved++;
     } catch (err) {
