@@ -15,6 +15,7 @@ function mockConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     allowedWorkItemTypes: ['Bug', 'User Story', 'Task'],
     skipTags: ['Recurring'],
     stateDir: '.state',
+    costLogPath: '.state/cost-ledger.jsonl',
     dryRun: false,
     ...overrides,
   };
@@ -60,6 +61,7 @@ function makeDeps(overrides: Partial<ProcessorDeps> = {}): ProcessorDeps {
         url: 'https://example.com/100',
       }),
     ),
+    recordLedger: mock(() => {}),
     ...overrides,
   };
 }
@@ -308,5 +310,96 @@ describe('processPR', () => {
 
     expect(result).toEqual({ prId: 42, resolved: 0, skipped: 1, errors: 0 });
     expect(deps.updateWorkItemFields).toHaveBeenCalledTimes(0);
+  });
+});
+
+describe('processPR ledger', () => {
+  function wi(id: number, fields: Record<string, unknown>) {
+    return { id, fields, rev: 1, url: '' };
+  }
+
+  test('records one line per linked work item with outcome and reason', async () => {
+    const config = mockConfig();
+    const pr = mockPR({ pullRequestId: 77 });
+    const items: Record<number, ReturnType<typeof wi>> = {
+      1: wi(1, { 'System.Title': 'Fix login', 'System.WorkItemType': 'Bug', 'System.State': 'Active' }),
+      2: wi(2, { 'System.Title': 'Epic thing', 'System.WorkItemType': 'Epic', 'System.State': 'Active' }),
+      3: wi(3, { 'System.Title': 'Old bug', 'System.WorkItemType': 'Bug', 'System.State': 'Closed' }),
+      4: wi(4, { 'System.Title': 'Weekly', 'System.WorkItemType': 'Task', 'System.State': 'Active', 'System.Tags': 'Recurring' }),
+      5: wi(5, { 'System.WorkItemType': 'Bug', 'System.State': 'New' }),
+    };
+    const recordLedger = mock(() => {});
+    const deps = makeDeps({
+      getPRWorkItems: mock(() => Promise.resolve([1, 2, 3, 4, 5].map(id => ({ id: String(id), url: '' })))),
+      getWorkItem: mock((_c: AppConfig, id: number) => Promise.resolve(items[id]!)),
+      updateWorkItemFields: mock((_c: AppConfig, id: number) =>
+        id === 5 ? Promise.reject(new Error('API error')) : Promise.resolve(wi(id, {})),
+      ),
+      recordLedger,
+    });
+
+    const result = await processPR(config, pr, deps);
+    expect(result).toEqual({ prId: 77, resolved: 1, skipped: 3, errors: 1 });
+
+    const entries = recordLedger.mock.calls.map(c => (c as unknown[])[1] as Record<string, unknown>);
+    expect(entries).toHaveLength(5);
+    for (const e of entries) {
+      expect(typeof e.at).toBe('string');
+      expect(Number.isNaN(Date.parse(e.at as string))).toBe(false);
+      expect(e.costUsd).toBe(0);
+      expect(e.prId).toBe(77);
+    }
+    const strip = ({ at: _at, ...rest }: Record<string, unknown>) => rest;
+    expect(entries.map(strip)).toEqual([
+      { workItemId: 1, outcome: 'resolved', costUsd: 0, title: 'Fix login', prId: 77 },
+      { workItemId: 2, outcome: 'skipped', costUsd: 0, title: 'Epic thing', prId: 77, reason: 'type' },
+      { workItemId: 3, outcome: 'skipped', costUsd: 0, title: 'Old bug', prId: 77, reason: 'terminal' },
+      { workItemId: 4, outcome: 'skipped', costUsd: 0, title: 'Weekly', prId: 77, reason: 'tag' },
+      { workItemId: 5, outcome: 'failed', costUsd: 0, prId: 77, reason: 'API error' },
+    ]);
+  });
+
+  test('records failed when the work item fetch itself fails', async () => {
+    const recordLedger = mock(() => {});
+    const deps = makeDeps({
+      getPRWorkItems: mock(() => Promise.resolve([{ id: '9', url: '' }])),
+      getWorkItem: mock(() => Promise.reject(new Error('404'))),
+      recordLedger,
+    });
+
+    const result = await processPR(mockConfig(), mockPR(), deps);
+    expect(result.errors).toBe(1);
+    expect(recordLedger).toHaveBeenCalledTimes(1);
+    const entry = (recordLedger.mock.calls[0] as unknown[])[1] as Record<string, unknown>;
+    expect(entry).toMatchObject({ workItemId: 9, outcome: 'failed', prId: 42, reason: '404' });
+    expect(entry.title).toBeUndefined();
+  });
+
+  test('writes nothing in dry run', async () => {
+    const recordLedger = mock(() => {});
+    const deps = makeDeps({
+      getPRWorkItems: mock(() => Promise.resolve([{ id: '100', url: '' }, { id: '101', url: '' }])),
+      getWorkItem: mock((_c: AppConfig, id: number) =>
+        Promise.resolve(wi(id, { 'System.WorkItemType': id === 100 ? 'Bug' : 'Epic', 'System.State': 'Active' })),
+      ),
+      recordLedger,
+    });
+
+    const result = await processPR(mockConfig({ dryRun: true }), mockPR(), deps);
+    expect(result.resolved).toBe(1);
+    expect(result.skipped).toBe(1);
+    expect(recordLedger).toHaveBeenCalledTimes(0);
+  });
+
+  test('a throwing ledger does not change the run result', async () => {
+    const deps = makeDeps({
+      getPRWorkItems: mock(() => Promise.resolve([{ id: '100', url: '' }])),
+      recordLedger: mock(() => {
+        throw new Error('disk full');
+      }),
+    });
+
+    const result = await processPR(mockConfig(), mockPR(), deps);
+    expect(result).toEqual({ prId: 42, resolved: 1, skipped: 0, errors: 0 });
   });
 });

@@ -7,6 +7,7 @@ import type {
 } from '../types/index.ts';
 
 import * as sdk from '../sdk/azure-devops-client.ts';
+import { getCostLedger, type LedgerRecord } from '../state/cost-ledger.ts';
 
 /** Terminal states that should not be transitioned. */
 const TERMINAL_STATES = ['Resolved', 'Closed'];
@@ -28,12 +29,16 @@ export interface ProcessorDeps {
     workItemId: number,
     fields: Array<{ field: string; value: unknown }>,
   ) => Promise<WorkItemResponse>;
+
+  /** Append one ledger line. Best-effort; must not throw into the run. */
+  recordLedger: (config: AppConfig, entry: LedgerRecord) => void;
 }
 
 const defaultDeps: ProcessorDeps = {
   getPRWorkItems: sdk.getPRWorkItems,
   getWorkItem: sdk.getWorkItem,
   updateWorkItemFields: sdk.updateWorkItemFields,
+  recordLedger: (config, entry) => getCostLedger(config.costLogPath).record(entry),
 };
 
 function log(message: string): void {
@@ -73,20 +78,44 @@ export async function processPR(
 
   for (const ref of workItemRefs) {
     const workItemId = Number(ref.id);
+    let title: string | undefined;
+
+    const record = (outcome: LedgerRecord['outcome'], reason?: string): void => {
+      if (config.dryRun) return;
+      const entry: LedgerRecord = {
+        at: new Date().toISOString(),
+        workItemId,
+        outcome,
+        costUsd: 0,
+        ...(title ? { title } : {}),
+        prId: pr.pullRequestId,
+        ...(reason ? { reason } : {}),
+      };
+      try {
+        deps.recordLedger(config, entry);
+      } catch {
+        // Bookkeeping must never affect the run.
+      }
+    };
+
     try {
       const workItem = await deps.getWorkItem(config, workItemId);
+      const rawTitle = workItem.fields['System.Title'];
+      if (typeof rawTitle === 'string' && rawTitle.length > 0) title = rawTitle;
 
       const workItemType = String(workItem.fields['System.WorkItemType'] ?? '');
       const currentState = String(workItem.fields['System.State'] ?? '');
 
       if (!config.allowedWorkItemTypes.includes(workItemType)) {
         log(`  WI #${workItemId}: Type "${workItemType}" not in allowed list, skipping`);
+        record('skipped', 'type');
         result.skipped++;
         continue;
       }
 
       if (TERMINAL_STATES.includes(currentState)) {
         log(`  WI #${workItemId}: Already "${currentState}", skipping`);
+        record('skipped', 'terminal');
         result.skipped++;
         continue;
       }
@@ -97,6 +126,7 @@ export async function processPR(
       const matchedTag = config.skipTags.find(st => tags.includes(st));
       if (matchedTag) {
         log(`  WI #${workItemId}: Has "${matchedTag}" tag, skipping`);
+        record('skipped', 'tag');
         result.skipped++;
         continue;
       }
@@ -114,9 +144,11 @@ export async function processPR(
         { field: 'System.AssignedTo', value: assignedTo },
       ]);
       log(`  WI #${workItemId}: ${currentState} → ${config.resolvedState}`);
+      record('resolved');
       result.resolved++;
     } catch (err) {
       log(`  WI #${workItemId}: Error — ${err}`);
+      record('failed', err instanceof Error ? err.message : String(err));
       result.errors++;
     }
   }

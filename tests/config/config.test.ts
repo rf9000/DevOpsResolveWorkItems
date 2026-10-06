@@ -1,3 +1,4 @@
+import { join } from "path";
 import { describe, expect, it } from "bun:test";
 import { loadConfig } from "../../src/config/index.ts";
 
@@ -51,6 +52,7 @@ describe("loadConfig", () => {
     expect(config.allowedWorkItemTypes).toEqual(["Bug", "User Story", "Task"]);
     expect(config.skipTags).toEqual(["Recurring"]);
     expect(config.stateDir).toBe(".state");
+    expect(config.costLogPath).toBe(join(".state", "cost-ledger.jsonl"));
   });
 
   it("overrides defaults when optional vars are provided", () => {
@@ -70,6 +72,12 @@ describe("loadConfig", () => {
     expect(config.allowedWorkItemTypes).toEqual(["Bug", "Feature"]);
     expect(config.skipTags).toEqual(["Recurring", "DoNotResolve"]);
     expect(config.stateDir).toBe("/tmp/state");
+    expect(config.costLogPath).toBe(join("/tmp/state", "cost-ledger.jsonl"));
+  });
+
+  it("uses COST_LOG_PATH when provided", () => {
+    const config = loadConfig({ ...validEnv, COST_LOG_PATH: "/data/ledger/resolve.jsonl" });
+    expect(config.costLogPath).toBe("/data/ledger/resolve.jsonl");
   });
 
   it("splits and trims allowed work item types", () => {

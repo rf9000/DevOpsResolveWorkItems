@@ -33,6 +33,7 @@ Environment variables:
   RESOLVED_STATE                Target work item state (default: Resolved)
   ALLOWED_WORK_ITEM_TYPES       Comma-separated types to resolve (default: Bug,User Story,Task)
   STATE_DIR                     State directory (default: .state)
+  COST_LOG_PATH                 JSONL ledger path (default: $STATE_DIR/cost-ledger.jsonl)
 `.trim();
 
 const command = process.argv[2];

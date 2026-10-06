@@ -1,3 +1,4 @@
+import { join } from "path";
 import { z } from "zod";
 import type { AppConfig } from "../types/index.ts";
 
@@ -11,6 +12,7 @@ const envSchema = z.object({
   ALLOWED_WORK_ITEM_TYPES: z.string().default("Bug,User Story,Task"),
   SKIP_TAGS: z.string().default("Recurring"),
   STATE_DIR: z.string().default(".state"),
+  COST_LOG_PATH: z.string().min(1).optional(),
 });
 
 export function loadConfig(
@@ -53,6 +55,7 @@ export function loadConfig(
     allowedWorkItemTypes,
     skipTags,
     stateDir: parsed.STATE_DIR,
+    costLogPath: parsed.COST_LOG_PATH ?? join(parsed.STATE_DIR, "cost-ledger.jsonl"),
     dryRun: false,
   };
 }

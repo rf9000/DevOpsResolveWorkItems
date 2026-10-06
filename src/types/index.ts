@@ -10,6 +10,8 @@ export interface AppConfig {
   allowedWorkItemTypes: string[];
   skipTags: string[];
   stateDir: string;
+  /** JSONL ledger path (one line per handled work item). */
+  costLogPath: string;
   dryRun: boolean;
 }
 

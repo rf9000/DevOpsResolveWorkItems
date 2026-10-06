@@ -26,6 +26,7 @@ function mockConfig(): AppConfig {
     allowedWorkItemTypes: ['Bug', 'User Story', 'Task'],
     skipTags: ['Recurring'],
     stateDir: '.state',
+    costLogPath: '.state/cost-ledger.jsonl',
     dryRun: false,
   };
 }
