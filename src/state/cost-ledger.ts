@@ -17,6 +17,8 @@ export interface LedgerRecord {
   prId: number;
   /** Why a work item was skipped ('type' | 'terminal' | 'tag') or failed. */
   reason?: string;
+  /** Who triggered the run: a user's email, or 'automatic' / 'unknown'. */
+  triggeredBy?: string;
 }
 
 export interface CostLedger {

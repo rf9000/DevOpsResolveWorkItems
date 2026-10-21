@@ -348,14 +348,15 @@ describe('processPR ledger', () => {
       expect(Number.isNaN(Date.parse(e.at as string))).toBe(false);
       expect(e.costUsd).toBe(0);
       expect(e.prId).toBe(77);
+      expect(e.triggeredBy).toBe('automatic');
     }
     const strip = ({ at: _at, ...rest }: Record<string, unknown>) => rest;
     expect(entries.map(strip)).toEqual([
-      { workItemId: 1, outcome: 'resolved', costUsd: 0, title: 'Fix login', prId: 77 },
-      { workItemId: 2, outcome: 'skipped', costUsd: 0, title: 'Epic thing', prId: 77, reason: 'type' },
-      { workItemId: 3, outcome: 'skipped', costUsd: 0, title: 'Old bug', prId: 77, reason: 'terminal' },
-      { workItemId: 4, outcome: 'skipped', costUsd: 0, title: 'Weekly', prId: 77, reason: 'tag' },
-      { workItemId: 5, outcome: 'failed', costUsd: 0, prId: 77, reason: 'API error' },
+      { workItemId: 1, outcome: 'resolved', costUsd: 0, title: 'Fix login', prId: 77, triggeredBy: 'automatic' },
+      { workItemId: 2, outcome: 'skipped', costUsd: 0, title: 'Epic thing', prId: 77, reason: 'type', triggeredBy: 'automatic' },
+      { workItemId: 3, outcome: 'skipped', costUsd: 0, title: 'Old bug', prId: 77, reason: 'terminal', triggeredBy: 'automatic' },
+      { workItemId: 4, outcome: 'skipped', costUsd: 0, title: 'Weekly', prId: 77, reason: 'tag', triggeredBy: 'automatic' },
+      { workItemId: 5, outcome: 'failed', costUsd: 0, prId: 77, reason: 'API error', triggeredBy: 'automatic' },
     ]);
   });
 

@@ -90,6 +90,7 @@ export async function processPR(
         ...(title ? { title } : {}),
         prId: pr.pullRequestId,
         ...(reason ? { reason } : {}),
+        triggeredBy: 'automatic',
       };
       try {
         deps.recordLedger(config, entry);
